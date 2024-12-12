@@ -35,16 +35,32 @@ app.use(
   serveIndex(folderToShare, {
     icons: true,
     template: (locals, callback) => {
-      // Generate file rows with search functionality
+      // Generate file and directory rows with search functionality
       const fileList = locals.fileList
-        .map(
-          (file) => `
-            <tr class="file-row">
-              <td class="file-name">${file.name}</td>
-              <td>${file.stat.size} bytes</td>
-              <td><a href="${locals.directory}${file.name}" download class="download-btn">Download</a></td>
-            </tr>`
-        )
+        .map((file) => {
+          const fileType = path.extname(file.name) || 'Folder'; // Get the file type (extension)
+          const fileLink = locals.directory + file.name; // Create the link to the file or directory
+
+          if (file.stat.isDirectory()) {
+            // Handle directories with a "Visit" button
+            return `
+              <tr class="file-row">
+                <td class="file-name"><a href="${fileLink}/">${file.name}</a></td>
+                <td>-</td>
+                <td class="file-type">Folder</td>
+                <td><a href="${fileLink}/" class="visit-btn">Visit</a></td>
+              </tr>`;
+          } else {
+            // Handle files with file type and download link
+            return `
+              <tr class="file-row">
+                <td class="file-name"><a href="${fileLink}" download>${file.name}</a></td>
+                <td>${file.stat.size} bytes</td>
+                <td class="file-type">${fileType}</td>
+                <td><a href="${fileLink}" download class="download-btn">Download</a></td>
+              </tr>`;
+          }
+        })
         .join('');
 
       // HTML template with search bar and styled file table
@@ -112,6 +128,21 @@ app.use(
             .download-btn:hover {
               background-color: #45a049;
             }
+            .visit-btn {
+              display: inline-block;
+              padding: 5px 10px;
+              background-color: #FFEB3B; /* Yellow button for directories */
+              color: black;
+              text-decoration: none;
+              border-radius: 3px;
+            }
+            .visit-btn:hover {
+              background-color: #fdd835;
+            }
+            .file-type {
+              font-style: italic;
+              color: #888;
+            }
             footer {
               text-align: center;
               margin: 20px 0;
@@ -143,6 +174,7 @@ app.use(
               <tr>
                 <th>File Name</th>
                 <th>Size</th>
+                <th>Type</th>
                 <th>Action</th>
               </tr>
             </thead>
