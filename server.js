@@ -1,48 +1,39 @@
-/**
- * Git Hub Link
- *
- * Created on : 12 Dec 2024
- * Description : Basic Server-Index Program on Node.js with File Search and Download Features.
- * To run the program, type the following commands in the terminal:
- * 1) npm install :- to install all dependencies.
- * 2) node server.js
- *
- * Place all the files you want to list in the "shared" folder.
- * Users can view files in a directory listing, search for specific files, and download them directly.
- * To check if the server is running, visit http://localhost:3000/files/.
- *
- * Created by Naman Jain
- */
-
-// Import the required modules
 const express = require('express');
 const path = require('path');
-const serveIndex = require('serve-index'); // Import serve-index
+const multer = require('multer');
+const serveIndex = require('serve-index');
+const fs = require('fs');
+require('dotenv').config();
+const port =process.env.SERVER_PORT
 
-// Initialize the app
 const app = express();
-
-// Define the folder to share
 const folderToShare = path.join(__dirname, './shared');
+const uploadPassword = process.env.UPLOAD_PASSWORD;
 
-/**
- * Middleware to serve static files and enable directory indexing with a custom template.
- * The template includes a search bar, a download button for each file, and an enhanced UI layout.
- */
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    cb(null, folderToShare);
+  },
+  filename: (req, file, cb) => {
+    cb(null, file.originalname);
+  },
+});
+const upload = multer({ storage });
+
+app.use(express.urlencoded({ extended: true }));
+
 app.use(
   '/files',
   express.static(folderToShare),
   serveIndex(folderToShare, {
     icons: true,
     template: (locals, callback) => {
-      // Generate file and directory rows with search functionality
       const fileList = locals.fileList
         .map((file) => {
-          const fileType = path.extname(file.name) || 'Folder'; // Get the file type (extension)
-          const fileLink = locals.directory + file.name; // Create the link to the file or directory
+          const fileType = path.extname(file.name) || 'Folder';
+          const fileLink = locals.directory + file.name;
 
           if (file.stat.isDirectory()) {
-            // Handle directories with a "Visit" button
             return `
               <tr class="file-row">
                 <td class="file-name"><a href="${fileLink}/">${file.name}</a></td>
@@ -51,10 +42,10 @@ app.use(
                 <td><a href="${fileLink}/" class="visit-btn">Visit</a></td>
               </tr>`;
           } else {
-            // Handle files with file type and download link
+            const isViewable = ['.pdf', '.txt', '.html', '.jpg', '.png'].includes(fileType.toLowerCase());
             return `
               <tr class="file-row">
-                <td class="file-name"><a href="${fileLink}" download>${file.name}</a></td>
+                <td class="file-name"><a href="${fileLink}" ${isViewable ? '' : 'download'}>${file.name}</a></td>
                 <td>${file.stat.size} bytes</td>
                 <td class="file-type">${fileType}</td>
                 <td><a href="${fileLink}" download class="download-btn">Download</a></td>
@@ -63,7 +54,6 @@ app.use(
         })
         .join('');
 
-      // HTML template with search bar and styled file table
       const html = `
         <!DOCTYPE html>
         <html lang="en">
@@ -73,101 +63,95 @@ app.use(
           <title>File Index</title>
           <style>
             body {
-              font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+              font-family: Arial, sans-serif;
               margin: 0;
               padding: 0;
-              background-color: #f9f9f9;
-              color: #333;
+              background-color: #f4f4f9;
             }
             header {
               background-color: #4CAF50;
               color: white;
-              text-align: center;
-              padding: 1rem 0;
-            }
-            .search-bar {
-              margin: 20px auto;
+              padding: 15px;
               text-align: center;
             }
-            input[type="text"] {
-              padding: 10px;
-              width: 60%;
-              font-size: 16px;
-              border: 1px solid #ccc;
-              border-radius: 5px;
+            nav {
+              text-align: center;
+              margin: 10px 0;
+            }
+            nav a {
+              text-decoration: none;
+              color: #4CAF50;
+              margin: 0 10px;
+              font-size: 18px;
+            }
+            nav a:hover {
+              text-decoration: underline;
             }
             table {
-              width: 80%;
+              width: 90%;
               margin: 20px auto;
               border-collapse: collapse;
-              background: white;
-              box-shadow: 0 0 10px rgba(0, 0, 0, 0.1);
+              box-shadow: 0 2px 4px rgba(0, 0, 0, 0.1);
+              background-color: white;
             }
-            th, td {
-              border: 1px solid #ddd;
+            table th, table td {
               padding: 12px;
               text-align: left;
+              border-bottom: 1px solid #ddd;
             }
-            th {
-              background-color: #f4f4f4;
-            }
-            tr:nth-child(even) {
-              background-color: #f9f9f9;
-            }
-            tr:hover {
-              background-color: #f1f1f1;
-            }
-            .download-btn {
-              display: inline-block;
-              padding: 5px 10px;
+            table th {
               background-color: #4CAF50;
               color: white;
-              text-decoration: none;
-              border-radius: 3px;
             }
-            .download-btn:hover {
-              background-color: #45a049;
+            .search-bar {
+              width: 90%;
+              margin: 20px auto;
+              display: flex;
+              justify-content: center;
+            }
+            .search-bar input {
+              width: 100%;
+              padding: 10px;
+              border: 1px solid #ddd;
+              border-radius: 4px;
+              font-size: 16px;
+            }
+            .file-row:hover {
+              background-color: #f1f1f1;
+            }
+            .visit-btn, .download-btn {
+              color: white;
+              padding: 6px 12px;
+              text-decoration: none;
+              border-radius: 4px;
             }
             .visit-btn {
-              display: inline-block;
-              padding: 5px 10px;
-              background-color: #FFEB3B; /* Yellow button for directories */
-              color: black;
-              text-decoration: none;
-              border-radius: 3px;
+              background-color: #2196F3;
             }
-            .visit-btn:hover {
-              background-color: #fdd835;
-            }
-            .file-type {
-              font-style: italic;
-              color: #888;
+            .download-btn {
+              background-color: #4CAF50;
             }
             footer {
+              background-color: #333;
+              color: white;
               text-align: center;
-              margin: 20px 0;
-              color: #666;
+              padding: 10px;
+              position: fixed;
+              bottom: 0;
+              width: 100%;
             }
           </style>
-          <script>
-            // JavaScript function to filter files based on the search query
-            function filterFiles() {
-              const query = document.getElementById('searchInput').value.toLowerCase();
-              const rows = document.querySelectorAll('.file-row');
-
-              rows.forEach(row => {
-                const fileName = row.querySelector('.file-name').textContent.toLowerCase();
-                row.style.display = fileName.includes(query) ? '' : 'none';
-              });
-            }
-          </script>
         </head>
         <body>
           <header>
             <h1>File Index</h1>
           </header>
+          <nav>
+            <a href="/">Home</a>
+            <a href="/upload">Upload File</a>
+          </nav>
           <div class="search-bar">
-            <input id="searchInput" type="text" placeholder="Search files..." onkeyup="filterFiles()" />
+            <input type="text" id="searchInput" placeholder="Search for files...">
           </div>
           <table>
             <thead>
@@ -178,13 +162,23 @@ app.use(
                 <th>Action</th>
               </tr>
             </thead>
-            <tbody>
+            <tbody id="fileTableBody">
               ${fileList}
             </tbody>
           </table>
           <footer>
-            <p>&copy; 2024 File Server by Naman Jain</p>
+            <p>Created by Naman Jain &copy; ${new Date().getFullYear()}</p>
           </footer>
+          <script>
+            document.getElementById('searchInput').addEventListener('input', function () {
+              const filter = this.value.toLowerCase();
+              const rows = document.querySelectorAll('.file-row');
+              rows.forEach(row => {
+                const fileName = row.querySelector('.file-name').textContent.toLowerCase();
+                row.style.display = fileName.includes(filter) ? '' : 'none';
+              });
+            });
+          </script>
         </body>
         </html>
       `;
@@ -194,16 +188,188 @@ app.use(
   })
 );
 
-// Set up a basic route
+// Home Page
 app.get('/', (req, res) => {
-  res.send(
-    `<h1>Welcome</h1><p>Access shared files at <a href="/files">/files</a></p>`
-  );
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Home</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 0;
+          background-color: #f4f4f9;
+          text-align: center;
+        }
+        header {
+          background-color: #4CAF50;
+          color: white;
+          padding: 20px;
+        }
+        .content {
+          margin-top: 30px;
+        }
+        .content a {
+          display: inline-block;
+          padding: 15px 25px;
+          margin: 10px;
+          text-decoration: none;
+          color: white;
+          background-color: #4CAF50;
+          border-radius: 5px;
+          font-size: 18px;
+        }
+        .content a:hover {
+          background-color: #45a049;
+        }
+        footer {
+          background-color: #333;
+          color: white;
+          text-align: center;
+          padding: 10px;
+          position: fixed;
+          bottom: 0;
+          width: 100%;
+        }
+      </style>
+    </head>
+    <body>
+      <header>
+        <h1>Welcome to the File Manager</h1>
+      </header>
+      <div class="content">
+        <a href="/files">View Files</a>
+        <a href="/upload">Upload Files</a>
+      </div>
+      <footer>
+        <p>Created by Naman Jain &copy; ${new Date().getFullYear()}</p>
+      </footer>
+    </body>
+    </html>
+  `);
 });
 
-// Start the server
-const PORT = 3000; // Port on which the service is running
+// Upload Page
+app.get('/upload', (req, res) => {
+  res.send(`
+    <!DOCTYPE html>
+    <html lang="en">
+    <head>
+      <meta charset="UTF-8">
+      <meta name="viewport" content="width=device-width, initial-scale=1.0">
+      <title>Upload File</title>
+      <style>
+        body {
+          font-family: Arial, sans-serif;
+          margin: 0;
+          padding: 0;
+          background-color: #f4f4f9;
+          text-align: center;
+        }
+        header {
+          background-color: #4CAF50;
+          color: white;
+          padding: 20px;
+        }
+        nav {
+          text-align: center;
+          margin: 10px 0;
+        }
+        nav a {
+          text-decoration: none;
+          color: #4CAF50;
+          margin: 0 10px;
+          font-size: 18px;
+        }
+        nav a:hover {
+          text-decoration: underline;
+        }
+        .content {
+          margin-top: 30px;
+        }
+        form {
+          margin-top: 30px;
+          text-align: left;
+          display: inline-block;
+          padding: 20px;
+          background-color: white;
+          border-radius: 5px;
+          box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+        }
+        form input[type="file"],
+        form input[type="password"] {
+          padding: 10px;
+          width: 250px;
+          margin: 10px;
+          border: 1px solid #ddd;
+          border-radius: 4px;
+        }
+        form button {
+          padding: 12px 25px;
+          background-color: #4CAF50;
+          color: white;
+          border: none;
+          border-radius: 4px;
+          font-size: 18px;
+        }
+        form button:hover {
+          background-color: #45a049;
+        }
+        footer {
+          background-color: #333;
+          color: white;
+          text-align: center;
+          padding: 10px;
+          position: fixed;
+          bottom: 0;
+          width: 100%;
+        }
+      </style>
+    </head>
+    <body>
+      <header>
+        <h1>Upload File</h1>
+      </header>
+      <nav>
+        <a href="/">Home</a>
+        <a href="/files">View Files</a>
+      </nav>
+      <div class="content">
+        <form action="/upload" method="POST" enctype="multipart/form-data">
+          <label for="password">Password:</label>
+          <input type="password" name="password" required />
+          <br />
+          <input type="file" name="file" required />
+          <br />
+          <button type="submit">Upload</button>
+        </form>
+      </div>
+      <footer>
+        <p>Created by Naman Jain &copy; ${new Date().getFullYear()}</p>
+      </footer>
+    </body>
+    </html>
+  `);
+});
+
+app.post('/upload', upload.single('file'), (req, res) => {
+  const { password } = req.body;
+  if (password !== uploadPassword) {
+    return res.status(403).send('Invalid password.');
+  }
+
+  if (!req.file) {
+    return res.status(400).send('No file uploaded.');
+  }
+
+  res.send(`File uploaded successfully: <a href="/files/${req.file.filename}">${req.file.filename}</a>`);
+});
+
+const PORT = 3000;
 app.listen(PORT, () => {
   console.log(`Server is running at http://localhost:${PORT}`);
-  console.log(`Shared folder is accessible at http://localhost:${PORT}/files`);
 });

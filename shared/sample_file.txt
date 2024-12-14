@@ -1,0 +1,8 @@
+
+# Example File for Download
+
+This is a sample file that you can download.
+
+Feel free to modify or use it for testing purposes.
+
+Thank you!
